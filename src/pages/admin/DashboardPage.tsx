@@ -1,7 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import {
   type ChartConfig,
   ChartContainer,
@@ -19,10 +25,16 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getCategories } from '@/api/categories'
-import { getInvitationStatsByEvent } from '@/api/invitations'
+import {
+  getInvitationStatsByEvent,
+  INVITATION_STATS_EVENT,
+} from '@/api/invitations'
 import { getErrorMessage } from '@/lib/get-error-message'
+import { createSocket } from '@/lib/socket'
+import type { InvitationStatsMessage } from '@/types/invitation'
 
 const ALL_CATEGORIES = 'all'
+const STATS_QUERY_KEY = ['invitations', 'stats-by-event']
 const BAR_ROW_HEIGHT = 40
 const MAX_LABEL_LENGTH = 20
 
@@ -46,6 +58,8 @@ function truncate(text: string) {
 }
 
 export function DashboardPage() {
+  const queryClient = useQueryClient()
+
   const categoriesQuery = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
@@ -59,23 +73,45 @@ export function DashboardPage() {
 
   const [filterCategory, setFilterCategory] = useState<string>(ALL_CATEGORIES)
 
-  // Key bắt đầu bằng 'invitations' để mọi mutation đang invalidate ['invitations']
-  // (thêm/sửa/xóa thiệp mời, sửa sự kiện) cũng làm mới luôn thống kê.
+  // Luôn lấy toàn bộ rồi lọc category ở client, vì socket cũng chỉ đẩy về dữ liệu
+  // chưa lọc — nhờ vậy ghi đè cache bằng message socket là đủ, không phải fetch lại.
   const statsQuery = useQuery({
-    queryKey: ['invitations', 'stats-by-event', { filterCategory }],
-    queryFn: () =>
-      getInvitationStatsByEvent({
-        categoryId:
-          filterCategory === ALL_CATEGORIES ? undefined : Number(filterCategory),
-      }),
+    queryKey: STATS_QUERY_KEY,
+    queryFn: () => getInvitationStatsByEvent(),
   })
 
-  const rows = statsQuery.data?.data ?? []
+  const [isLive, setIsLive] = useState(false)
+
+  useEffect(() => {
+    const socket = createSocket()
+
+    socket.on('connect', () => setIsLive(true))
+    socket.on('disconnect', () => setIsLive(false))
+    socket.on('connect_error', () => setIsLive(false))
+    socket.on(INVITATION_STATS_EVENT, (message: InvitationStatsMessage) => {
+      queryClient.setQueryData(STATS_QUERY_KEY, message.stats)
+    })
+    // Trong lúc mất kết nối có thể đã lỡ message, nên lấy lại số liệu một lần.
+    socket.io.on('reconnect', () => {
+      queryClient.invalidateQueries({ queryKey: STATS_QUERY_KEY })
+    })
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [queryClient])
+
+  const rows = (statsQuery.data?.data ?? []).filter(
+    (row) =>
+      filterCategory === ALL_CATEGORIES ||
+      row.categoryId === Number(filterCategory),
+  )
+  const total = rows.reduce((sum, row) => sum + row.total, 0)
   const totalActive = rows.reduce((sum, row) => sum + row.active, 0)
   const totalInactive = rows.reduce((sum, row) => sum + row.inactive, 0)
 
   const summaries = [
-    { label: 'Tổng thiệp mời', value: statsQuery.data?.total ?? 0 },
+    { label: 'Tổng thiệp mời', value: total },
     { label: 'Hoạt động', value: totalActive },
     { label: 'Tạm ẩn', value: totalInactive },
     { label: 'Sự kiện', value: rows.length },
@@ -133,6 +169,14 @@ export function DashboardPage() {
       <Card className="mt-4">
         <CardHeader>
           <CardTitle>Thiệp mời theo sự kiện</CardTitle>
+          <CardAction>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span
+                className={`size-2 rounded-full ${isLive ? 'bg-success' : 'bg-muted-foreground/40'}`}
+              />
+              {isLive ? 'Cập nhật trực tiếp' : 'Chưa kết nối trực tiếp'}
+            </span>
+          </CardAction>
         </CardHeader>
         <CardContent>
           {statsQuery.isLoading && <Skeleton className="h-64 w-full" />}

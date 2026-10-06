@@ -95,9 +95,9 @@ Cả hai cùng chạy — đây là chủ ý, không phải trùng lặp. `getEr
 
 ### Query key & invalidation
 
-Key đang dùng: `['categories']`, `['events', {filters}]`, `['event-options']`, `['invitations', {filters}]`, `['invitations', 'stats-by-event', {filters}]`, `['users']`.
+Key đang dùng: `['categories']`, `['events', {filters}]`, `['event-options']`, `['invitations', {filters}]`, `['invitations', 'stats-by-event']`, `['users']`.
 
-Thống kê ở Dashboard cố ý nằm dưới tiền tố `invitations` để mọi chỗ invalidate `['invitations']` làm mới luôn biểu đồ. Thêm/xóa event không invalidate nó, nhưng Dashboard là trang khác nên query tự fetch lại khi mount (staleTime mặc định 0).
+Thống kê ở Dashboard cố ý nằm dưới tiền tố `invitations` để mọi chỗ invalidate `['invitations']` làm mới luôn biểu đồ. Key này **không có filter**: luôn lấy toàn bộ rồi lọc `categoryId` ở client, vì socket chỉ đẩy dữ liệu chưa lọc (xem Realtime).
 
 `event-options` tách riêng khỏi `events` vì backend chưa có endpoint "lấy tất cả sự kiện" — `getEventOptions()` gọi `getEvents({page:1, limit:1000})` để đổ dropdown.
 
@@ -105,6 +105,12 @@ Quan hệ invalidation phải giữ khi sửa mutation:
 - **category**: create/delete chỉ invalidate `categories`; update invalidate thêm `events` (event nhúng object `category`)
 - thêm/sửa/xóa **event** → invalidate `events` + `event-options`; riêng update còn phải invalidate `invitations` (invitation nhúng object `event`)
 - mutation **invitation** → invalidate `invitations`
+
+### Realtime (Socket.IO)
+
+`src/lib/socket.ts` — `createSocket()` kết nối tới `VITE_API_URL` (phải là origin thuần, path sẽ bị hiểu là namespace), gửi JWT qua `auth: { token }` dạng hàm để mỗi lần reconnect đọc token mới. Thiếu/sai token thì server từ chối ngay lúc handshake.
+
+Hiện chỉ `DashboardPage` dùng: mở socket trong `useEffect` khi vào trang, `disconnect` khi rời. Nhận `INVITATION_STATS_EVENT` (`invitation:stats-by-event`) → `setQueryData` ghi đè cache thống kê, không fetch lại; `reconnect` → invalidate một lần để bù message bị lỡ. Server bắn khi invitation/event thay đổi, kể cả do admin khác.
 
 ### Upload ảnh
 

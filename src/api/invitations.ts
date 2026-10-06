@@ -16,6 +16,9 @@ export async function getInvitations(params: GetInvitationsParams = {}) {
   return data
 }
 
+// Tên event Socket.IO, server bắn mỗi khi số liệu biểu đồ thay đổi.
+export const INVITATION_STATS_EVENT = 'invitation:stats-by-event'
+
 export async function getInvitationStatsByEvent(
   params: GetInvitationStatsParams = {},
 ) {

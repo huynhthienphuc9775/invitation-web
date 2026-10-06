@@ -45,6 +45,7 @@ export interface UpdateInvitationPayload {
 export interface InvitationCountByEvent {
   eventId: number
   eventName: string
+  categoryId: number
   total: number
   active: number
   inactive: number
@@ -57,4 +58,12 @@ export interface InvitationStatsByEvent {
 
 export interface GetInvitationStatsParams {
   categoryId?: number
+}
+
+// `stats` server đẩy qua socket luôn là toàn bộ, không lọc theo category.
+export interface InvitationStatsMessage {
+  source: 'invitation' | 'event'
+  action: 'created' | 'updated' | 'deleted'
+  id: number
+  stats: InvitationStatsByEvent
 }
