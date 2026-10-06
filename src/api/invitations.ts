@@ -1,8 +1,10 @@
 import { apiClient } from '@/lib/api-client'
 import type {
   CreateInvitationPayload,
+  GetInvitationStatsParams,
   GetInvitationsParams,
   Invitation,
+  InvitationStatsByEvent,
   PaginatedInvitations,
   UpdateInvitationPayload,
 } from '@/types/invitation'
@@ -11,6 +13,16 @@ export async function getInvitations(params: GetInvitationsParams = {}) {
   const { data } = await apiClient.get<PaginatedInvitations>('/invitations', {
     params,
   })
+  return data
+}
+
+export async function getInvitationStatsByEvent(
+  params: GetInvitationStatsParams = {},
+) {
+  const { data } = await apiClient.get<InvitationStatsByEvent>(
+    '/invitations/stats/by-event',
+    { params },
+  )
   return data
 }
 

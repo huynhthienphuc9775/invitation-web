@@ -95,7 +95,9 @@ Cả hai cùng chạy — đây là chủ ý, không phải trùng lặp. `getEr
 
 ### Query key & invalidation
 
-Key đang dùng: `['categories']`, `['events', {filters}]`, `['event-options']`, `['invitations', {filters}]`, `['users']`.
+Key đang dùng: `['categories']`, `['events', {filters}]`, `['event-options']`, `['invitations', {filters}]`, `['invitations', 'stats-by-event', {filters}]`, `['users']`.
+
+Thống kê ở Dashboard cố ý nằm dưới tiền tố `invitations` để mọi chỗ invalidate `['invitations']` làm mới luôn biểu đồ. Thêm/xóa event không invalidate nó, nhưng Dashboard là trang khác nên query tự fetch lại khi mount (staleTime mặc định 0).
 
 `event-options` tách riêng khỏi `events` vì backend chưa có endpoint "lấy tất cả sự kiện" — `getEventOptions()` gọi `getEvents({page:1, limit:1000})` để đổ dropdown.
 

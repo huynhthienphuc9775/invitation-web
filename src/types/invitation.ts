@@ -41,3 +41,20 @@ export interface UpdateInvitationPayload {
   image?: File
   active?: boolean
 }
+
+export interface InvitationCountByEvent {
+  eventId: number
+  eventName: string
+  total: number
+  active: number
+  inactive: number
+}
+
+export interface InvitationStatsByEvent {
+  data: InvitationCountByEvent[]
+  total: number
+}
+
+export interface GetInvitationStatsParams {
+  categoryId?: number
+}
