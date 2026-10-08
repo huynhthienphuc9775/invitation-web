@@ -55,3 +55,7 @@ export async function getCustomers(params: GetCustomersParams = {}) {
   })
   return data
 }
+
+export async function deleteCustomer(id: number) {
+  await apiClient.delete(`/customers/${id}`)
+}

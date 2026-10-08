@@ -1,5 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,8 +28,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getCustomers } from '@/api/customers'
+import { deleteCustomer, getCustomers } from '@/api/customers'
 import { getErrorMessage } from '@/lib/get-error-message'
+import { toast } from '@/lib/toast'
+import type { Customer } from '@/types/customer'
 
 const PAGE_SIZE = 10
 const ALL_STATUSES = 'all'
@@ -33,6 +45,8 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 export function CustomersPage() {
+  const queryClient = useQueryClient()
+
   const [page, setPage] = useState(1)
   const [filterStatus, setFilterStatus] = useState<string>(ALL_STATUSES)
   const [searchInput, setSearchInput] = useState('')
@@ -61,6 +75,35 @@ export function CustomersPage() {
   function handleFilterStatusChange(value: string) {
     setFilterStatus(value)
     setPage(1)
+  }
+
+  const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(
+    null,
+  )
+
+  const isDeletingRef = useRef(false)
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteCustomer,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] })
+      toast.success(`Đã xóa khách hàng "${deletingCustomer?.email}"`)
+      setDeletingCustomer(null)
+    },
+    onSettled: () => {
+      isDeletingRef.current = false
+    },
+  })
+
+  function openDeleteDialog(customer: Customer) {
+    deleteMutation.reset()
+    setDeletingCustomer(customer)
+  }
+
+  function handleDelete() {
+    if (isDeletingRef.current || !deletingCustomer) return
+    isDeletingRef.current = true
+    deleteMutation.mutate(deletingCustomer.id)
   }
 
   return (
@@ -100,26 +143,27 @@ export function CustomersPage() {
               <TableHead>Email</TableHead>
               <TableHead>Trạng thái</TableHead>
               <TableHead>Ngày đăng ký</TableHead>
+              <TableHead className="w-24 text-right">Hành động</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {customersQuery.isLoading && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   Đang tải...
                 </TableCell>
               </TableRow>
             )}
             {customersQuery.isError && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-destructive">
+                <TableCell colSpan={5} className="text-center text-destructive">
                   {getErrorMessage(customersQuery.error)}
                 </TableCell>
               </TableRow>
             )}
             {customersQuery.isSuccess && customersQuery.data.data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   Chưa có khách hàng nào.
                 </TableCell>
               </TableRow>
@@ -135,6 +179,16 @@ export function CustomersPage() {
                 </TableCell>
                 <TableCell>
                   {new Date(customer.createdAt).toLocaleString('vi-VN')}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() => openDeleteDialog(customer)}
+                  >
+                    Xóa
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -168,6 +222,36 @@ export function CustomersPage() {
           </div>
         </div>
       )}
+
+      <AlertDialog
+        open={Boolean(deletingCustomer)}
+        onOpenChange={(open) => !open && setDeletingCustomer(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xóa khách hàng?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Hành động này không thể hoàn tác. Tài khoản "
+              {deletingCustomer?.email}" sẽ bị xóa vĩnh viễn; email này có thể
+              đăng ký lại từ đầu.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteMutation.isError && (
+            <p className="text-sm text-destructive">
+              {getErrorMessage(deleteMutation.error)}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteMutation.isPending}
+              onClick={handleDelete}
+            >
+              {deleteMutation.isPending ? 'Đang xóa...' : 'Xóa'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

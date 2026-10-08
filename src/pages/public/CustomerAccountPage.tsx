@@ -1,5 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import axios from 'axios'
 import { House, LogOut } from 'lucide-react'
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,6 +17,10 @@ import { getCurrentCustomer } from '@/api/customers'
 import { getErrorMessage } from '@/lib/get-error-message'
 import { useCustomerAuthStore } from '@/store/auth-store'
 
+function isNotFoundError(error: unknown) {
+  return axios.isAxiosError(error) && error.response?.status === 404
+}
+
 export function CustomerAccountPage() {
   const queryClient = useQueryClient()
   const logout = useCustomerAuthStore((state) => state.logout)
@@ -22,6 +28,9 @@ export function CustomerAccountPage() {
   const customerQuery = useQuery({
     queryKey: ['customer-me'],
     queryFn: getCurrentCustomer,
+    // 404 là trạng thái cố định (tài khoản đã bị xóa), thử lại vô ích.
+    retry: (failureCount, error) =>
+      !isNotFoundError(error) && failureCount < 3,
   })
 
   function handleLogout() {
@@ -29,6 +38,14 @@ export function CustomerAccountPage() {
     queryClient.removeQueries({ queryKey: ['customer-me'] })
     logout()
   }
+
+  // Admin xóa tài khoản thì token cũ vẫn hợp lệ tới khi hết hạn, backend trả
+  // 404 thay vì 401 nên interceptor không tự đăng xuất — phải tự làm ở đây.
+  useEffect(() => {
+    if (!isNotFoundError(customerQuery.error)) return
+    queryClient.removeQueries({ queryKey: ['customer-me'] })
+    logout()
+  }, [customerQuery.error, queryClient, logout])
 
   const customer = customerQuery.data
 

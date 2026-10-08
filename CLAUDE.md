@@ -80,7 +80,7 @@ Backend có **hai loại tài khoản độc lập**, phân biệt bằng `role`
 
 `src/store/auth-store.ts` — `createAuthStore(name, role)` sinh hai store Zustand + `persist` tách biệt: `useAuthStore` (admin, key `auth-storage`) và `useCustomerAuthStore` (key `customer-auth-storage`). Hai phiên có thể cùng tồn tại. Mỗi store chỉ giữ `accessToken` + `isAuthenticated`; **không có refresh token**, hết hạn là đăng xuất. Option `merge` bỏ token có `role` không khớp (kể cả token cũ chưa có `role`) ngay lúc nạp lại — vì backend trả 403 chứ không phải 401, interceptor không tự gỡ được. `src/lib/jwt.ts` chỉ decode payload, không verify.
 
-`src/lib/api-client.ts` — `createApiClient(store)` sinh `apiClient` (admin) và `customerApiClient` (chỉ dùng trong `src/api/customers.ts`). Lưu ý `src/api/customers.ts` dùng **cả hai**: các hàm của khách hàng đi qua `customerApiClient`, còn `getCustomers` (danh sách cho admin, `GET /customers`) phải đi qua `apiClient`. Mỗi client cài hai interceptor gắn với đúng store của nó:
+`src/lib/api-client.ts` — `createApiClient(store)` sinh `apiClient` (admin) và `customerApiClient` (chỉ dùng trong `src/api/customers.ts`). Lưu ý `src/api/customers.ts` dùng **cả hai**: các hàm của khách hàng đi qua `customerApiClient`, còn `getCustomers`/`deleteCustomer` (dành cho admin) phải đi qua `apiClient`. Mỗi client cài hai interceptor gắn với đúng store của nó:
 - request: gắn `Authorization: Bearer <accessToken>`
 - response: 401 **chỉ khi đang đăng nhập** → `logout()` + toast "hết hạn phiên". 401 lúc login được thả xuống cho trang login tự hiển thị.
 
@@ -89,6 +89,7 @@ Luồng khách hàng (email bất kỳ, mật khẩu 8–72 ký tự):
 2. `POST /customers/verify-otp { email, otp, password }` → trả token. Backend **bắt buộc gửi lại mật khẩu**, nên mật khẩu chỉ giữ trong state của trang, không lưu đâu khác.
 3. `POST /customers/login` trả **403** khi mật khẩu đúng nhưng email chưa xác thực → `CustomerLoginPage` chuyển sang `CustomerOtpForm` với email/mật khẩu vừa nhập.
 4. `POST /customers/resend-otp` có cooldown 60s (backend trả 429); form đếm ngược ở client để khớp.
+5. Admin xóa khách (`DELETE /customers/:id`, xóa hẳn) thì token của khách vẫn hợp lệ tới khi hết hạn và `/customers/me` trả **404** — `CustomerAccountPage` tự đăng xuất khi gặp 404.
 
 Endpoint lệch quy ước cần nhớ: đăng ký là `POST /user` (không phải `/auth/register`), danh sách user là `GET /user` (số ít).
 
