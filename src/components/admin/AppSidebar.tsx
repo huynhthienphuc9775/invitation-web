@@ -9,7 +9,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { CalendarDays, LayoutDashboard, Mail, Tags, Users } from "lucide-react";
+import {
+  CalendarDays,
+  Contact,
+  LayoutDashboard,
+  Mail,
+  Tags,
+  Users,
+} from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 const navItems = [
@@ -23,6 +30,7 @@ const navItems = [
   { to: "/admin/categories", label: "Danh mục", icon: Tags, end: false },
   { to: "/admin/events", label: "Sự kiện", icon: CalendarDays, end: false },
   { to: "/admin/users", label: "Người dùng", icon: Users, end: false },
+  { to: "/admin/customers", label: "Khách hàng", icon: Contact, end: false },
 ];
 
 export function AppSidebar() {

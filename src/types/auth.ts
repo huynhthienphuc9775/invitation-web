@@ -12,3 +12,6 @@ export interface RegisterPayload {
   email: string
   password: string
 }
+
+// Backend phân biệt hai loại tài khoản qua `role` trong payload JWT.
+export type Role = 'admin' | 'customer'

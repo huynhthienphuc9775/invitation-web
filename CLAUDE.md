@@ -42,10 +42,12 @@ Mỗi trang là một file tự chứa: query, mutation, state của form/dialog
 ### Định tuyến (`src/App.tsx`)
 
 - `/` — `HomePage`, công khai
+- `RequireCustomerGuest` → `AuthLayout` → `/account/login`, `/account/register` (khách hàng)
+- `RequireCustomer` → `/account` (trang tài khoản khách hàng)
 - `RequireGuest` → `AuthLayout` → `/login`, `/register`
-- `RequireAuth` → `/admin` + `AdminLayout` (sidebar + header), các trang con: index (dashboard), `invitations`, `categories`, `events`, `users`
+- `RequireAuth` → `/admin` + `AdminLayout` (sidebar + header), các trang con: index (dashboard), `invitations`, `categories`, `events`, `users`, `customers`
 
-Guard đọc `isAuthenticated` từ Zustand. `RequireGuest` trả người dùng về `location.state.from` nếu có, mặc định `/admin`.
+Guard đọc `isAuthenticated` từ Zustand. `RequireGuest` trả người dùng về `location.state.from` nếu có, mặc định `/admin`; `RequireCustomerGuest` tương tự, mặc định `/account`.
 
 ### Hai luồng: admin và public
 
@@ -56,10 +58,10 @@ src/components/
   ui/       shadcn sinh ra — dùng chung, không sửa tay
   shared/   dùng ở CẢ HAI luồng (RequireAuth, RequireGuest)
   admin/    chỉ luồng admin (AppSidebar, Header)
-  public/   chỉ luồng công khai
+  public/   chỉ luồng công khai (RequireCustomer, RequireCustomerGuest, CustomerOtpForm)
 src/pages/
-  admin/    Dashboard, Categories, Events, Invitations, Users
-  public/   HomePage
+  admin/    Dashboard, Categories, Events, Invitations, Users, Customers
+  public/   HomePage, CustomerLogin/Register/AccountPage
   auth/     Login, Register
 src/layouts/
   AdminLayout.tsx   sidebar + header, dùng cho /admin
@@ -74,11 +76,19 @@ Khi luồng public phát triển nhiều trang và cần khung riêng, thêm `sr
 
 ### Auth
 
-`src/store/auth-store.ts` — Zustand + `persist`, lưu localStorage key `auth-storage`. Chỉ giữ `accessToken` + `isAuthenticated`; **không có refresh token**, hết hạn là đăng xuất.
+Backend có **hai loại tài khoản độc lập**, phân biệt bằng `role` trong payload JWT (`'admin' | 'customer'`): admin (`User`) và khách hàng (`Customer`). Route admin chỉ nhận token `role: 'admin'` (token khác → 403), socket thống kê cũng vậy.
 
-`src/lib/api-client.ts` cài hai interceptor:
-- request: gắn `Authorization: Bearer <accessToken>` đọc từ `useAuthStore.getState()`
-- response: 401 **chỉ khi đang đăng nhập** → `logout()` + toast "hết hạn phiên". 401 lúc login được thả xuống cho `LoginPage` tự hiển thị.
+`src/store/auth-store.ts` — `createAuthStore(name, role)` sinh hai store Zustand + `persist` tách biệt: `useAuthStore` (admin, key `auth-storage`) và `useCustomerAuthStore` (key `customer-auth-storage`). Hai phiên có thể cùng tồn tại. Mỗi store chỉ giữ `accessToken` + `isAuthenticated`; **không có refresh token**, hết hạn là đăng xuất. Option `merge` bỏ token có `role` không khớp (kể cả token cũ chưa có `role`) ngay lúc nạp lại — vì backend trả 403 chứ không phải 401, interceptor không tự gỡ được. `src/lib/jwt.ts` chỉ decode payload, không verify.
+
+`src/lib/api-client.ts` — `createApiClient(store)` sinh `apiClient` (admin) và `customerApiClient` (chỉ dùng trong `src/api/customers.ts`). Lưu ý `src/api/customers.ts` dùng **cả hai**: các hàm của khách hàng đi qua `customerApiClient`, còn `getCustomers` (danh sách cho admin, `GET /customers`) phải đi qua `apiClient`. Mỗi client cài hai interceptor gắn với đúng store của nó:
+- request: gắn `Authorization: Bearer <accessToken>`
+- response: 401 **chỉ khi đang đăng nhập** → `logout()` + toast "hết hạn phiên". 401 lúc login được thả xuống cho trang login tự hiển thị.
+
+Luồng khách hàng (email bất kỳ, mật khẩu 8–72 ký tự):
+1. `POST /customers/register` → gửi OTP 6 số qua mail → trang chuyển sang `CustomerOtpForm`.
+2. `POST /customers/verify-otp { email, otp, password }` → trả token. Backend **bắt buộc gửi lại mật khẩu**, nên mật khẩu chỉ giữ trong state của trang, không lưu đâu khác.
+3. `POST /customers/login` trả **403** khi mật khẩu đúng nhưng email chưa xác thực → `CustomerLoginPage` chuyển sang `CustomerOtpForm` với email/mật khẩu vừa nhập.
+4. `POST /customers/resend-otp` có cooldown 60s (backend trả 429); form đếm ngược ở client để khớp.
 
 Endpoint lệch quy ước cần nhớ: đăng ký là `POST /user` (không phải `/auth/register`), danh sách user là `GET /user` (số ít).
 
@@ -95,7 +105,7 @@ Cả hai cùng chạy — đây là chủ ý, không phải trùng lặp. `getEr
 
 ### Query key & invalidation
 
-Key đang dùng: `['categories']`, `['events', {filters}]`, `['event-options']`, `['invitations', {filters}]`, `['invitations', 'stats-by-event']`, `['users']`.
+Key đang dùng: `['categories']`, `['events', {filters}]`, `['event-options']`, `['invitations', {filters}]`, `['invitations', 'stats-by-event']`, `['users']`, `['customers', {filters}]`, `['customer-me']` (xóa khi khách đăng xuất).
 
 Thống kê ở Dashboard cố ý nằm dưới tiền tố `invitations` để mọi chỗ invalidate `['invitations']` làm mới luôn biểu đồ. Key này **không có filter**: luôn lấy toàn bộ rồi lọc `categoryId` ở client, vì socket chỉ đẩy dữ liệu chưa lọc (xem Realtime).
 
