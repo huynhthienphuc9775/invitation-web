@@ -92,6 +92,12 @@ export function LoginPage() {
               Trang chủ
             </Link>
           </p>
+          <p className="text-center text-sm text-muted-foreground">
+            Bạn là khách hàng?{" "}
+            <Link to="/account/login" className="font-medium text-primary">
+              Đăng nhập tài khoản khách hàng
+            </Link>
+          </p>
         </form>
       </CardContent>
     </Card>

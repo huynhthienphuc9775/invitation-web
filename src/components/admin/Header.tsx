@@ -1,12 +1,13 @@
-import { House, LogOut } from 'lucide-react'
+import { House, LogOut, UserRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
-import { useAuthStore } from '@/store/auth-store'
+import { useAuthStore, useCustomerAuthStore } from '@/store/auth-store'
 
 export function Header() {
   const logout = useAuthStore((state) => state.logout)
+  const isCustomer = useCustomerAuthStore((state) => state.isAuthenticated)
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background px-4">
@@ -20,6 +21,12 @@ export function Header() {
           <House className="size-4" />
           Trang chủ
         </Button>
+        {isCustomer && (
+          <Button variant="ghost" size="sm" render={<Link to="/account" />}>
+            <UserRound className="size-4" />
+            Tài khoản khách hàng
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"

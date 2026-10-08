@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import { House, LogOut } from 'lucide-react'
+import { House, LayoutDashboard, LogOut } from 'lucide-react'
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
@@ -15,7 +15,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { getCurrentCustomer } from '@/api/customers'
 import { getErrorMessage } from '@/lib/get-error-message'
-import { useCustomerAuthStore } from '@/store/auth-store'
+import { useAuthStore, useCustomerAuthStore } from '@/store/auth-store'
 
 function isNotFoundError(error: unknown) {
   return axios.isAxiosError(error) && error.response?.status === 404
@@ -24,6 +24,7 @@ function isNotFoundError(error: unknown) {
 export function CustomerAccountPage() {
   const queryClient = useQueryClient()
   const logout = useCustomerAuthStore((state) => state.logout)
+  const isAdmin = useAuthStore((state) => state.isAuthenticated)
 
   const customerQuery = useQuery({
     queryKey: ['customer-me'],
@@ -82,11 +83,19 @@ export function CustomerAccountPage() {
               </dl>
             )
           )}
-          <div className="flex justify-between gap-2">
-            <Button variant="ghost" size="sm" render={<Link to="/" />}>
-              <House className="size-4" />
-              Trang chủ
-            </Button>
+          <div className="flex flex-wrap justify-between gap-2">
+            <div className="flex gap-1">
+              <Button variant="ghost" size="sm" render={<Link to="/" />}>
+                <House className="size-4" />
+                Trang chủ
+              </Button>
+              {isAdmin && (
+                <Button variant="ghost" size="sm" render={<Link to="/admin" />}>
+                  <LayoutDashboard className="size-4" />
+                  Trang quản trị
+                </Button>
+              )}
+            </div>
             <Button
               variant="ghost"
               size="sm"

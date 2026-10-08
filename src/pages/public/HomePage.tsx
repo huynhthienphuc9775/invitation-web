@@ -23,6 +23,12 @@ export function HomePage() {
           </>
         )}
       </div>
+      <Link
+        to="/admin"
+        className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+      >
+        Trang quản trị
+      </Link>
     </div>
   );
 }

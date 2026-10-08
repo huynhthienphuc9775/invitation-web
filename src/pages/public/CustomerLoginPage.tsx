@@ -105,6 +105,12 @@ export function CustomerLoginPage() {
                 Đăng ký
               </Link>
             </p>
+            <p className="text-center text-sm text-muted-foreground">
+              Bạn là quản trị viên?{' '}
+              <Link to="/login" className="font-medium text-primary">
+                Đăng nhập trang quản trị
+              </Link>
+            </p>
           </form>
         )}
       </CardContent>
